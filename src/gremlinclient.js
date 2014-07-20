@@ -117,12 +117,17 @@ GremlinClient.prototype.sendMessage = function(command) {
   this.ws.send(JSON.stringify(command.message));
 };
 
+/**
+ * Get the inner function body from a function.toString() representation
+ *
+ * @param {Function}
+ * @return {String}
+ */
 GremlinClient.prototype.extractFunctionBody = function(fn) {
-  var stringBody = '';
-  var arrayBody = fn.toString().split('\n');
-  stringBody = arrayBody.slice(1, arrayBody.length - 1).join('\n');
+  var body = fn.toString();
+  body = body.substring(body.indexOf("{") + 1, body.lastIndexOf("}"));
 
-  return stringBody;
+  return body;
 };
 
 GremlinClient.prototype.execute = function(script, bindings, callback) {
