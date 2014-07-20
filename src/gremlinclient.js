@@ -88,8 +88,10 @@ GremlinClient.prototype.terminateCommands = function(reason) {
   });
 };
 
-GremlinClient.prototype.buildCommand = function(script, handlers) {
+GremlinClient.prototype.buildCommand = function(script, bindings, handlers) {
   var guid = Guid.create().value;
+  bindings = bindings || {};
+
   var command = {
     message: {
       requestId: guid,
@@ -97,7 +99,9 @@ GremlinClient.prototype.buildCommand = function(script, handlers) {
       op: "eval",
       args: {
         gremlin: script,
-        accept: "application/json"
+        bindings: bindings,
+        accept: "application/json",
+        language: "nashorn",
       }
     },
     onData: handlers.onData,
@@ -113,9 +117,24 @@ GremlinClient.prototype.sendMessage = function(command) {
   this.ws.send(JSON.stringify(command.message));
 };
 
-GremlinClient.prototype.execute = function(script, callback) {
-  var command = this.buildCommand(script, {
-    script: script,
+GremlinClient.prototype.extractFunctionBody = function(fn) {
+  var stringBody = '';
+  var arrayBody = fn.toString().split('\n');
+  stringBody = arrayBody.slice(1, arrayBody.length - 1).join('\n');
+
+  return stringBody;
+};
+
+GremlinClient.prototype.execute = function(script, bindings, callback) {
+  if (typeof script === 'function') {
+    script = this.extractFunctionBody(script);
+  }
+
+  if (typeof bindings === 'function') {
+    callback = bindings;
+  }
+
+  var command = this.buildCommand(script, bindings, {
     onData: function(message) {
       this.result = this.result.concat(message.result);
     },
@@ -130,11 +149,14 @@ GremlinClient.prototype.execute = function(script, callback) {
   this.sendOrEnqueueCommand(command);
 };
 
-GremlinClient.prototype.stream = function(script) {
+GremlinClient.prototype.stream = function(script, bindings) {
+  if (typeof script === 'function') {
+    script = this.extractFunctionBody(script);
+  }
+
   var stream = new Stream();
 
-  var command = this.buildCommand(script, {
-    script: script,
+  var command = this.buildCommand(script, bindings, {
     onData: function(data) {
       stream.emit('data', data);
       stream.emit('result', data.result, data);
